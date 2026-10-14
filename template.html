@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>季線突破監控</title>
+<title>選股監控</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,9 +36,13 @@ body {
 }
 .wrap { max-width: 720px; margin: 0 auto; padding: 28px 16px 48px; }
 h1 { font-size: 1.5rem; line-height: 1.3; margin: 0; letter-spacing: .02em; }
-.cond { color: var(--sub); font-size: .875rem; margin: 6px 0 0; max-width: 60ch; }
+.cond { color: var(--sub); font-size: .875rem; margin: 12px 2px 0; max-width: 60ch; }
 
-.dates { display: flex; gap: 8px; overflow-x: auto; margin: 22px -16px 0; padding: 2px 16px 10px; scrollbar-width: none; }
+.tabs { display: flex; gap: 4px; margin-top: 20px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.tab { flex: 1; border: 0; background: none; color: var(--sub); font: 500 .9rem/1.3 inherit; font-family: inherit; padding: 9px 6px; border-radius: 9px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--sel); color: var(--panel); font-weight: 700; }
+.tab:focus-visible { outline: 2px solid var(--sel); outline-offset: 2px; }
+.dates { display: flex; gap: 8px; overflow-x: auto; margin: 14px -16px 0; padding: 2px 16px 10px; scrollbar-width: none; }
 .dates::-webkit-scrollbar { display: none; }
 .chip {
   flex: none; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
@@ -81,7 +85,8 @@ footer { color: var(--sub); font-size: .75rem; margin-top: 28px; line-height: 1.
 </head>
 <body>
 <div class="wrap">
-  <h1>季線突破監控</h1>
+  <h1>選股監控</h1>
+  <div class="tabs" id="tabs" role="tablist" aria-label="選股策略"></div>
   <p class="cond" id="cond"></p>
   <nav class="dates" id="dates" aria-label="選擇交易日"></nav>
   <main id="main"></main>
@@ -107,30 +112,39 @@ function spark(c, m) {
     <circle class="dot" cx="${x(last).toFixed(1)}" cy="${y(c[last]).toFixed(1)}" r="3.5"/></svg>`;
 }
 
-function renderDay(day) {
+let cur = { sid: null, date: null };
+
+function renderDay() {
+  const strat = DATA.strategies.find(x => x.id === cur.sid);
+  const day = DATA.days.find(x => x.date === cur.date) || DATA.days[0];
+  const rows = (day.strategies && day.strategies[cur.sid]) || [];
   const d = new Date(day.date + "T00:00:00");
   const title = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
-  let html = `<div class="day"><h2>${title}</h2><div class="count">${day.rows.length}<small>檔符合</small></div></div>`;
-  if (!day.rows.length) {
-    html += `<div class="empty">這天沒有股票同時符合三個條件。<br>點上方其他日期看看之前的結果。</div>`;
+  let html = `<div class="day"><h2>${title}</h2><div class="count">${rows.length}<small>檔符合</small></div></div>`;
+  if (!rows.length) {
+    html += `<div class="empty">這天沒有股票符合「${esc(strat.name)}」。<br>可以換其他日期或策略看看。</div>`;
   } else {
-    html += `<ul class="list">` + day.rows.map(r => `
+    html += `<ul class="list">` + rows.map(r => `
       <li class="item">
         <div class="top">
           <a class="name" href="https://tw.stock.yahoo.com/quote/${esc(r.code)}" target="_blank" rel="noopener"><span class="code">${esc(r.code)}</span>${esc(r.name)}</a>
           <span class="price">${fmt(r.close)}</span>
         </div>
-        ${spark(r.spark || [], r.ma_line || [])}
-        <div class="stats">
-          <div class="stat">高於季線<b class="up">+${fmt(r.pct)}%</b></div>
-          <div class="stat">量比<b>${fmt(r.ratio, 1)} 倍</b></div>
-          <div class="stat">法人買超<b>${fmt(r.net_lots, 0)} 張</b></div>
-        </div>
+        ${spark(r.spark || [], r.ref || [])}
+        <div class="stats">${(r.stats || []).map(([label, val, hi]) =>
+          `<div class="stat">${esc(label)}<b${hi ? ' class="up"' : ""}>${esc(val)}</b></div>`).join("")}</div>
       </li>`).join("") + `</ul>
-      <div class="legend"><span><i></i>收盤價</span><span><i class="m"></i>季線</span></div>`;
+      <div class="legend"><span><i></i>收盤價</span><span><i class="m"></i>${esc(strat.ref_name)}</span></div>`;
   }
   $("main").innerHTML = html;
-  document.querySelectorAll(".chip").forEach(b => b.setAttribute("aria-pressed", b.dataset.date === day.date));
+  $("cond").textContent = "條件：" + strat.desc;
+  document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-selected", b.dataset.sid === cur.sid));
+  $("dates").innerHTML = DATA.days.map(dd => {
+    const [, m, x] = dd.date.split("-");
+    const n = ((dd.strategies || {})[cur.sid] || []).length;
+    return `<button class="chip${n ? " has" : ""}" data-date="${dd.date}" aria-pressed="${dd.date === day.date}"><b>${+m}/${+x}</b><span>${n ? n + " 檔" : "無"}</span></button>`;
+  }).join("");
+  history.replaceState(null, "", "#" + cur.sid + "/" + day.date);
 }
 
 function init() {
@@ -138,21 +152,19 @@ function init() {
     $("main").innerHTML = `<div class="empty">還沒有資料。到 GitHub 專案的 Actions 頁面，手動執行一次 daily-scan。</div>`;
     return;
   }
-  $("cond").textContent = "條件：" + DATA.conditions;
   $("foot").innerHTML = `資料來源：臺灣證券交易所（上市股票）<br>最後更新 ${esc(DATA.updated)}<br>僅供篩選參考，不構成投資建議。`;
-  $("dates").innerHTML = DATA.days.map(day => {
-    const [, m, dd] = day.date.split("-");
-    const n = day.rows.length;
-    return `<button class="chip${n ? " has" : ""}" data-date="${day.date}" aria-pressed="false"><b>${+m}/${+dd}</b><span>${n ? n + " 檔" : "無"}</span></button>`;
-  }).join("");
-  $("dates").addEventListener("click", e => {
-    const b = e.target.closest(".chip");
-    if (!b) return;
-    const day = DATA.days.find(x => x.date === b.dataset.date);
-    if (day) { renderDay(day); history.replaceState(null, "", "#" + day.date); }
+  $("tabs").innerHTML = DATA.strategies.map(st =>
+    `<button class="tab" role="tab" data-sid="${esc(st.id)}" aria-selected="false">${esc(st.name)}</button>`).join("");
+  $("tabs").addEventListener("click", e => {
+    const b = e.target.closest(".tab"); if (b) { cur.sid = b.dataset.sid; renderDay(); }
   });
-  const want = location.hash.slice(1);
-  renderDay(DATA.days.find(x => x.date === want) || DATA.days[0]);
+  $("dates").addEventListener("click", e => {
+    const b = e.target.closest(".chip"); if (b) { cur.date = b.dataset.date; renderDay(); }
+  });
+  const [sid, date] = location.hash.slice(1).split("/");
+  cur.sid = DATA.strategies.some(x => x.id === sid) ? sid : DATA.strategies[0].id;
+  cur.date = DATA.days.some(x => x.date === date) ? date : DATA.days[0].date;
+  renderDay();
 }
 init();
 </script>

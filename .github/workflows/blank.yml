@@ -1,36 +1,32 @@
-# This is a basic workflow to help you get started with Actions
+name: daily-scan
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
+  schedule:
+    - cron: "30 9 * * 1-5"   # 週一到五 台灣時間 17:30
   workflow_dispatch:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+permissions:
+  contents: write
+
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  scan:
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    env:
+      TZ: Asia/Taipei
+      TG_TOKEN: ${{ secrets.TG_TOKEN }}
+      TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+      PAGE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
-
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests pandas
+      - run: python stock_alert.py
+      - name: 存回資料與網頁
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add docs twse_cache
+          git diff --cached --quiet || git commit -m "update $(date +%F)"
+          git push

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>季線突破監控</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #EDF0F3; --panel: #FFFFFF; --ink: #17202B; --sub: #5D6775;
+  --line: #D8DDE4; --up: #C42F28; --up-soft: #F8E4E2; --ma: #9AA3AF; --sel: #1E4A84;
+  --num: "Barlow Semi Condensed", "Noto Sans TC", system-ui, sans-serif;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11171E; --panel: #19212B; --ink: #E6EBF1; --sub: #93A0AE;
+    --line: #2A3440; --up: #F26A62; --up-soft: #3A2224; --ma: #5F6B79; --sel: #8BB2E8;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11171E; --panel: #19212B; --ink: #E6EBF1; --sub: #93A0AE;
+  --line: #2A3440; --up: #F26A62; --up-soft: #3A2224; --ma: #5F6B79; --sel: #8BB2E8;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.6 "Noto Sans TC", system-ui, -apple-system, "PingFang TC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 720px; margin: 0 auto; padding: 28px 16px 48px; }
+h1 { font-size: 1.5rem; line-height: 1.3; margin: 0; letter-spacing: .02em; }
+.cond { color: var(--sub); font-size: .875rem; margin: 6px 0 0; max-width: 60ch; }
+
+.dates { display: flex; gap: 8px; overflow-x: auto; margin: 22px -16px 0; padding: 2px 16px 10px; scrollbar-width: none; }
+.dates::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  border-radius: 10px; padding: 6px 12px; cursor: pointer; text-align: left; font: inherit;
+}
+.chip b { display: block; font: 600 1.05rem/1.2 var(--num); }
+.chip span { font-size: .75rem; color: var(--sub); }
+.chip.has span { color: var(--up); font-weight: 500; }
+.chip[aria-pressed="true"] { border-color: var(--sel); box-shadow: inset 0 0 0 1px var(--sel); }
+.chip:focus-visible, a:focus-visible { outline: 2px solid var(--sel); outline-offset: 2px; }
+
+.day { display: flex; align-items: baseline; justify-content: space-between; margin: 18px 0 10px; }
+.day h2 { font-size: 1.05rem; margin: 0; }
+.day .count { font: 600 1.6rem/1 var(--num); color: var(--up); }
+.day .count small { font: 500 .8rem "Noto Sans TC", sans-serif; color: var(--sub); margin-left: 3px; }
+
+.list { list-style: none; margin: 0; padding: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.item { padding: 14px 16px 12px; border-top: 1px solid var(--line); }
+.item:first-child { border-top: 0; }
+.top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.name { color: inherit; text-decoration: none; font-weight: 700; font-size: 1.05rem; }
+.name .code { font: 600 1.05rem var(--num); color: var(--sub); margin-right: 6px; }
+.name:hover { text-decoration: underline; }
+.price { font: 600 1.4rem/1 var(--num); color: var(--up); }
+.spark { display: block; width: 100%; height: auto; margin: 8px 0 6px; }
+.spark .px { fill: none; stroke: var(--ink); stroke-width: 1.6; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.spark .ma { fill: none; stroke: var(--ma); stroke-width: 1.4; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.spark .dot { fill: var(--up); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { font-size: .75rem; color: var(--sub); }
+.stat b { display: block; font: 600 1.05rem/1.3 var(--num); color: var(--ink); }
+.stat b.up { color: var(--up); }
+.legend { display: flex; gap: 14px; font-size: .75rem; color: var(--sub); margin: 10px 2px 0; }
+.legend i { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--ink); vertical-align: middle; margin-right: 5px; }
+.legend i.m { border-top: 2px dashed var(--ma); }
+
+.empty { background: var(--panel); border: 1px dashed var(--line); border-radius: 14px; padding: 28px 18px; text-align: center; color: var(--sub); }
+footer { color: var(--sub); font-size: .75rem; margin-top: 28px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>季線突破監控</h1>
+  <p class="cond" id="cond"></p>
+  <nav class="dates" id="dates" aria-label="選擇交易日"></nav>
+  <main id="main"></main>
+  <footer id="foot"></footer>
+</div>
+<script>
+const DATA = {"updated": "2026-10-14 18:09", "conditions": "三大法人連買3日、收盤剛站上60日均線、成交量達前5日均量1.5倍以上（至少500張）", "days": [{"date": "2026-10-14", "rows": [{"code": "1229", "name": "聯華", "close": 41.5, "ma": 40.91, "pct": 1.43, "ratio": 1.68, "net_lots": 5324, "spark": [41.15, 40.95, 41.45, 42.05, 42.4, 41.9, 41.7, 41.95, 42.15, 42.15, 41.8, 41.6, 41.95, 42.1, 41.85, 41.65, 41.7, 41.95, 41.75, 40.7, 40.35, 40.35, 40.05, 40.35, 40.85, 40.25, 39.95, 40.0, 40.1, 39.55, 39.9, 40.2, 40.0, 39.65, 39.45, 39.65, 39.95, 40.05, 40.65, 41.5], "ma_line": [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 40.96, 40.95, 40.94, 40.93, 40.92, 40.92, 40.9, 40.91]}, {"code": "2014", "name": "中鴻", "close": 17.2, "ma": 16.99, "pct": 1.22, "ratio": 3.09, "net_lots": 2662, "spark": [17.1, 16.95, 16.9, 17.35, 17.5, 17.3, 17.2, 17.25, 17.15, 17.05, 17.05, 17.05, 16.95, 16.9, 17.0, 17.0, 17.0, 17.05, 16.9, 16.65, 16.5, 16.25, 16.35, 16.55, 16.55, 16.55, 16.6, 16.65, 16.9, 16.8, 17.4, 17.1, 17.1, 16.85, 16.95, 16.9, 16.95, 16.95, 16.85, 17.2], "ma_line": [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 17.02, 17.02, 17.01, 17.01, 17.01, 17.0, 16.99, 16.99]}]}]};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n, d = 2) => Number(n).toLocaleString("zh-TW", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+function spark(c, m) {
+  const vals = c.concat(m).filter(v => v != null);
+  if (vals.length < 2) return "";
+  const W = 320, H = 64, P = 4, lo = Math.min(...vals), hi = Math.max(...vals);
+  const x = i => P + (W - 2 * P) * i / (c.length - 1);
+  const y = v => H - P - (H - 2 * P) * (v - lo) / ((hi - lo) || 1);
+  const pts = a => a.map((v, i) => v == null ? null : x(i).toFixed(1) + "," + y(v).toFixed(1)).filter(Boolean).join(" ");
+  const last = c.length - 1;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" aria-hidden="true">
+    <polyline class="ma" points="${pts(m)}"/><polyline class="px" points="${pts(c)}"/>
+    <circle class="dot" cx="${x(last).toFixed(1)}" cy="${y(c[last]).toFixed(1)}" r="3.5"/></svg>`;
+}
+
+function renderDay(day) {
+  const d = new Date(day.date + "T00:00:00");
+  const title = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  let html = `<div class="day"><h2>${title}</h2><div class="count">${day.rows.length}<small>檔符合</small></div></div>`;
+  if (!day.rows.length) {
+    html += `<div class="empty">這天沒有股票同時符合三個條件。<br>點上方其他日期看看之前的結果。</div>`;
+  } else {
+    html += `<ul class="list">` + day.rows.map(r => `
+      <li class="item">
+        <div class="top">
+          <a class="name" href="https://tw.stock.yahoo.com/quote/${esc(r.code)}" target="_blank" rel="noopener"><span class="code">${esc(r.code)}</span>${esc(r.name)}</a>
+          <span class="price">${fmt(r.close)}</span>
+        </div>
+        ${spark(r.spark || [], r.ma_line || [])}
+        <div class="stats">
+          <div class="stat">高於季線<b class="up">+${fmt(r.pct)}%</b></div>
+          <div class="stat">量比<b>${fmt(r.ratio, 1)} 倍</b></div>
+          <div class="stat">法人買超<b>${fmt(r.net_lots, 0)} 張</b></div>
+        </div>
+      </li>`).join("") + `</ul>
+      <div class="legend"><span><i></i>收盤價</span><span><i class="m"></i>季線</span></div>`;
+  }
+  $("main").innerHTML = html;
+  document.querySelectorAll(".chip").forEach(b => b.setAttribute("aria-pressed", b.dataset.date === day.date));
+}
+
+function init() {
+  if (!DATA || !DATA.days || !DATA.days.length) {
+    $("main").innerHTML = `<div class="empty">還沒有資料。到 GitHub 專案的 Actions 頁面，手動執行一次 daily-scan。</div>`;
+    return;
+  }
+  $("cond").textContent = "條件：" + DATA.conditions;
+  $("foot").innerHTML = `資料來源：臺灣證券交易所（上市股票）<br>最後更新 ${esc(DATA.updated)}<br>僅供篩選參考，不構成投資建議。`;
+  $("dates").innerHTML = DATA.days.map(day => {
+    const [, m, dd] = day.date.split("-");
+    const n = day.rows.length;
+    return `<button class="chip${n ? " has" : ""}" data-date="${day.date}" aria-pressed="false"><b>${+m}/${+dd}</b><span>${n ? n + " 檔" : "無"}</span></button>`;
+  }).join("");
+  $("dates").addEventListener("click", e => {
+    const b = e.target.closest(".chip");
+    if (!b) return;
+    const day = DATA.days.find(x => x.date === b.dataset.date);
+    if (day) { renderDay(day); history.replaceState(null, "", "#" + day.date); }
+  });
+  const want = location.hash.slice(1);
+  renderDay(DATA.days.find(x => x.date === want) || DATA.days[0]);
+}
+init();
+</script>
+</body>
+</html>
